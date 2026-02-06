@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  pascualkyu_bot:
+    build: .
+    container_name: pascualkyu_bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONIOENCODING=utf-8
