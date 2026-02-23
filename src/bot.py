@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ext import commands
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from classes.flip7 import Flip7Lobby
 import asyncio
 import random
 
@@ -249,6 +250,11 @@ async def roll(ctx: commands.Context, maximo: int = 100):
     embed.set_footer(text=f"Rango: 1 - {maximo}")
     
     await ctx.send(embed=embed)
+
+@bot.hybrid_command(name="flip7", description="Inicia un lobby de Flip 7 multijugador")
+async def flip7(ctx: commands.Context):
+    lobby = Flip7Lobby(ctx.author)
+    await ctx.send(f"🎮 **{ctx.author.name}** ha iniciado un lobby de **Flip 7**. ¡Únanse con el botón de abajo! ✨", view=lobby)
 
 # Tip: Manejo de error por si alguien sin el rol intenta borrar
 @add.error
