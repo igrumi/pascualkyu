@@ -2,19 +2,20 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
-from supabase import create_client, Client
+from utils.database import supabase
 from dotenv import load_dotenv
-from classes.flip7 import Flip7Lobby
+from classes.flip7 import *
+from classes.watchlist import WatchlistView, VistoView, DeleteView
 import asyncio
 import random
+from utils import emotes
 
 # Configuración de Supabase
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 URL = os.getenv("SUPABASE_URL")
 KEY = os.getenv("SUPABASE_KEY")
-
-supabase: Client = create_client(URL, KEY)
+admin_id = int(os.getenv("ADMIN_ID"))
 
 class Pascualkyu(commands.Bot):
     def __init__(self):
@@ -29,6 +30,12 @@ class Pascualkyu(commands.Bot):
 bot = Pascualkyu()
 
 @bot.event
+async def on_ready():
+    # En cuanto el bot conecta, llena las variables de emotes.py
+    emotes.setup_emotes(bot)
+    print(f"✅ Bot conectado como {bot.user} y emotes cargados.")
+
+@bot.event
 async def on_message(message):
     # 1. Si el autor del mensaje es un bot, lo ignoramos por completo
     if message.author.bot:
@@ -39,107 +46,13 @@ async def on_message(message):
 ROSA_PALO = 0xF2C1D1
 
 # --- COMANDOS ---
-class WatchlistView(discord.ui.View):
-    def __init__(self, data, titulo_lista, per_page=5):
-        super().__init__(timeout=60)
-        self.data = data
-        self.titulo_lista = titulo_lista 
-        self.per_page = per_page
-        self.current_page = 0
-        self.total_pages = (len(data) - 1) // per_page + 1
-
-        # Lógica de visibilidad:
-        # Si solo hay una página, removemos los botones de la vista
-        if self.total_pages <= 1:
-            self.remove_item(self.previous)
-            self.remove_item(self.next)
-
-    def create_embed(self):
-        start = self.current_page * self.per_page
-        end = start + self.per_page
-        items = self.data[start:end]
-
-        embed = discord.Embed(
-            title=f"{self.titulo_lista}",
-            color=0xF2C1D1
-        )
-
-        for i, anime in enumerate(items, start=start + 1):
-            embed.add_field(
-                name=f"{i}. {anime['title']}",
-                value="", # Un pequeño detalle para que no esté vacío
-                inline=False
-            )
-        
-        # Opcional: Solo mostrar el footer de paginación si hay más de una página
-        if self.total_pages > 1:
-            embed.set_footer(text=f"Página {self.current_page + 1} de {self.total_pages}")
-        
-        return embed
-
-    @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="⬅️")
-    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.current_page > 0:
-            self.current_page -= 1
-            await interaction.response.edit_message(embed=self.create_embed(), view=self)
-
-    @discord.ui.button(label="Siguiente", style=discord.ButtonStyle.secondary, emoji="➡️")
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.current_page < self.total_pages - 1:
-            self.current_page += 1
-            await interaction.response.edit_message(embed=self.create_embed(), view=self)
-class VistoSelect(discord.ui.Select):
-    def __init__(self, animes):
-        # Creamos las opciones del menú basadas en los animes de la DB
-        options = [
-            discord.SelectOption(label=a['title'], description="Marcar como visto") 
-            for a in animes[:25] # Limitamos a los primeros 25
-        ]
-        super().__init__(placeholder="Elige un anime de la lista...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        # Lo que pasa cuando eligen un anime
-        titulo = self.values[0]
-        supabase.table("watchlist").update({"status": True}).eq("title", titulo).execute()
-        
-        await interaction.response.send_message(f"✅ ¡Listo! **{titulo}** ahora está en la lista de vistos.")
-
-class VistoView(discord.ui.View):
-    def __init__(self, animes):
-        super().__init__()
-        self.add_item(VistoSelect(animes))
-
-class DeleteSelect(discord.ui.Select):
-    def __init__(self, animes):
-        # Creamos las opciones del menú con los animes pendientes
-        options = [
-            discord.SelectOption(label=a['title'], description="Eliminar permanentemente de la lista 🗑️") 
-            for a in animes[:25]
-        ]
-        super().__init__(placeholder="Elige el anime que quieres eliminar...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        titulo = self.values[0]
-        # Eliminamos de la base de datos
-        result = supabase.table("watchlist").delete().eq("title", titulo).execute()
-        
-        if result.data:
-            await interaction.response.send_message(f"¡Listo! He borrado **{titulo}** de la lista.")
-        else:
-            await interaction.response.send_message(f"❌ Hubo un error al intentar borrar **{titulo}**.", ephemeral=True)
-
-class DeleteView(discord.ui.View):
-    def __init__(self, animes):
-        super().__init__(timeout=60)
-        self.add_item(DeleteSelect(animes))
-
 @bot.command()
 @commands.is_owner() # Solo tú puedes usarlo
 async def sync(ctx):
     try:
         # Sincroniza los comandos con el servidor actual
         fmt = await bot.tree.sync()
-        await ctx.send(f"¡Sincronizados {len(fmt)} comandos con éxito!")
+        await ctx.send(f"¡Sincronizados {len(fmt)} comandos con éxito! {emotes.kase}", ephemeral=True)
     except Exception as e:
         await ctx.send(f"Error al sincronizar: {e}")
 
@@ -150,9 +63,8 @@ async def add(ctx: commands.Context, *, titulo: str):
     # ctx.author.name funciona tanto en mensaje como en slash
     data = {"title": titulo, "added_by": ctx.author.name, "status": False}
     supabase.table("watchlist").insert(data).execute()
-    emote = discord.utils.get(bot.emojis, name="kase")
-    if emote:
-        embed = discord.Embed(description=f"{emote} **{titulo}** añadido a la lista.", color=ROSA_PALO)
+    if emotes.kase:
+        embed = discord.Embed(description=f"{emotes.kase} **{titulo}** añadido a la lista.", color=ROSA_PALO)
     else:
         embed = discord.Embed(description=f"**{titulo}** añadido a la lista.", color=ROSA_PALO)
     await ctx.send(embed=embed)
@@ -164,13 +76,11 @@ async def ruleta(ctx: commands.Context):
         return await ctx.send("No hay animes pendientes.")
     
     # Aquí añadimos un pequeño efecto de suspenso
-    msg = await ctx.send("🔍 Eligiendo")
+    msg = await ctx.send(f"{emotes.mrtitties} Eligiendo.")
     await asyncio.sleep(0.5) # Espera 2 segundos
-    await msg.edit(content="🔍 Eligiendo.")
+    await msg.edit(content=f"{emotes.mrpenis} Eligiendo..")
     await asyncio.sleep(0.5)
-    await msg.edit(content="🔍 Eligiendo..")
-    await asyncio.sleep(0.5)
-    await msg.edit(content="🔍 Eligiendo...")
+    await msg.edit(content=f"{emotes.mrballs} Eligiendo...")
 
     elegido = random.choice(response.data)
     embed = discord.Embed(title="Pascualito ha elegido...", description=f"**{elegido['title']}**", color=ROSA_PALO)
@@ -227,7 +137,6 @@ async def delete(ctx: commands.Context, *, titulo: str = None): # Ponemos el tí
     if not animes:
         return await ctx.send("No hay animes pendientes para eliminar.")
 
-    # Mostramos el menú que ya habías creado
     view = DeleteView(animes)
     await ctx.send("Selecciona el anime que deseas eliminar de la lista:", view=view)
 
@@ -240,8 +149,7 @@ async def roll(ctx: commands.Context, maximo: int = 100):
 
     # Caso 1 y 2 unificados: elegimos entre 1 y el valor de 'maximo'
     resultado = random.randint(1, maximo)
-    
-    # Creamos un embed bonito para el resultado
+
     embed = discord.Embed(
         title="🎲 ¡Roll!",
         description=f"El número elegido es: **{resultado}**",
@@ -254,7 +162,7 @@ async def roll(ctx: commands.Context, maximo: int = 100):
 @bot.hybrid_command(name="flip7", description="Inicia un lobby de Flip 7 multijugador")
 async def flip7(ctx: commands.Context):
     lobby = Flip7Lobby(ctx.author)
-    await ctx.send(f"🎮 **{ctx.author.name}** ha iniciado un lobby de **Flip 7**. ¡Únanse con el botón de abajo! ✨", view=lobby)
+    await ctx.send(f"🎮 **{ctx.author.name}** ha iniciado un lobby de **Flip 7**. ¡Únanse con el botón de abajo! {emotes.happy}", view=lobby)
 
 # Tip: Manejo de error por si alguien sin el rol intenta borrar
 @add.error
