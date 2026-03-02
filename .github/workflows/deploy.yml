@@ -1,0 +1,26 @@
+name: Deploy Pascualkyu Bot
+
+on:
+  push:
+    branches:
+      - main  # Se activa solo cuando haces merge o push a main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy a Hetzner via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd ~/apps/pascualkyu
+            
+            git pull origin main
+            
+            docker-compose up -d --build
+            
+            docker image prune -f
