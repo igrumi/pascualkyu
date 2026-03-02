@@ -3,7 +3,7 @@ name: Deploy Pascualkyu Bot
 on:
   push:
     branches:
-      - main  # Se activa solo cuando haces merge o push a main
+      - main
 
 jobs:
   deploy:
