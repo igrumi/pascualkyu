@@ -57,7 +57,7 @@ class Unitedle(commands.Cog):
             embed.add_field(name="Pista 3 (Mega)", value=mega, inline=True)
 
         if guess == target_name:
-            embed.title = "¡Ganaste! emotes.oshahappy"
+            embed.title = f"¡Ganaste! {emotes.oshahappy}"
             embed.set_image(url=pokemon['image_url'])
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
