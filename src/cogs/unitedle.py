@@ -23,6 +23,15 @@ class Unitedle(commands.Cog):
         pokemon = daily.data['pokemon_unite']
         target_name = pokemon['name'].upper()
 
+        already_won = self.supabase.table("user_attempts").select("id") \
+            .eq("user_id", interaction.user.id) \
+            .eq("date", today) \
+            .eq("guess", target_name).execute()
+        
+        if already_won.data:
+            await interaction.response.send_message(f"{emotes.angii} Ya adivinaste el Pokémon de hoy, inténtalo de nuevo a las 00:00.\n El Pokémon era: **{target_name}**", ephemeral=True)
+            return
+
         if not guess:
             await interaction.response.send_message(f"{emotes.kase} **Unitedle**\nEl Pokémon de hoy tiene {len(target_name)} letras. Cada 3 intentos recibirás una pista adicional. ¡Buena suerte! {emotes.kase}", ephemeral=True)
             return
