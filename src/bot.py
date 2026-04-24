@@ -33,6 +33,7 @@ bot = Pascualkyu()
 
 @bot.event
 async def on_ready():
+    keep_alive.start()
     emotes.setup_emotes(bot)
     print(f"✅ Bot conectado como {bot.user} y emotes cargados.")
 
@@ -162,7 +163,11 @@ async def delete_error(ctx, error):
 
 @tasks.loop(hours=48)
 async def keep_alive():
-    supabase.table("watchlist").select("id").limit(1).execute()
+    try:
+        supabase.table("watchlist").select("id").limit(1).execute()
+        print("✅ Heartbeat a Supabase enviado.")
+    except Exception as e:
+        print(f"❌ Error al enviar heartbeat a Supabase: {e}")
     
 if __name__ == "__main__":
     bot.run(TOKEN)
