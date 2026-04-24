@@ -61,7 +61,7 @@ class Unitedle(commands.Cog):
             embed.set_image(url=pokemon['image_url'])
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
-            await interaction.channel.send(f"🎉 ¡{interaction.user.mention} ha acertado el Pokémon del día!")
+            await interaction.channel.send(f"{emotes.bleh} ¡{interaction.user.mention} ha acertado el Pokémon del día!")
         else:
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
