@@ -23,7 +23,7 @@ class Unitedle(commands.Cog):
         pokemon = daily.data['pokemon_unite']
         target_name = pokemon['name'].upper()
 
-        already_won = self.supabase.table("user_attempts").select("id") \
+        already_won = self.supabase.table("user_attempts").select("*") \
             .eq("user_id", interaction.user.id) \
             .eq("date", today) \
             .eq("guess", target_name).execute()
