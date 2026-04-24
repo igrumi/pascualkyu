@@ -1,4 +1,4 @@
-from asyncio import tasks
+from discord.ext import tasks
 import os
 import discord
 from discord import app_commands
